@@ -134,6 +134,7 @@ def main():
         # Create Label Embeddings
         dictionary_of_labels = {}
         dictionary_of_labels_index = {}
+
         dictionary_of_labels_index[0] = 'T-NEU'
         dictionary_of_labels_index[1] = 'T-POS'
         dictionary_of_labels_index[2] = 'T-NEG'
@@ -145,6 +146,7 @@ def main():
         dictionary_of_labels['T-NEG'] = [0, 0, 1, 0]  # T-NEG
         dictionary_of_labels['O'] = [0, 0, 0, 1]  # O
         dictionary_of_labels['START'] = [0, 0, 0, 0]  # START
+
         for key in dictionary_of_labels.keys():
             dictionary_of_label_embeddings[key] = torch.FloatTensor([dictionary_of_labels[key]])
 
