@@ -20,7 +20,7 @@ from gensim.test.utils import datapath
 You may also use other parsing functions, but ONLY for parsing and ONLY from that file.
 '''
 embed_dimension = 10
-epochs = 100
+epochs = 10
 
 
 class NeuralNet(nn.Module):
@@ -105,9 +105,9 @@ def main():
         train_set = read_data(path=args.train_file)
         test_set = read_data(path=args.test_file)
 
-        train_set1 = train_set[0:1692]
-        validation_set = train_set[1692:len(train_set)]
-        train_set = train_set1
+        #train_set1 = train_set[0:1692]
+        #validation_set = train_set[1692:len(train_set)]
+        #train_set = train_set1
 
         words = set()
         for sentence in train_set:
@@ -149,7 +149,7 @@ def main():
         dictionary_of_labels['T-POS'] = [0, 1, 0, 0]  # T-POS
         dictionary_of_labels['T-NEG'] = [0, 0, 1, 0]  # T-NEG
         dictionary_of_labels['O'] = [0, 0, 0, 1]  # O
-        dictionary_of_labels['START'] = [1, 1, 1, 1]  # START
+        dictionary_of_labels['START'] = [0, 0, 0, 0]  # START
 
         for key in dictionary_of_labels.keys():
             dictionary_of_label_embeddings[key] = torch.FloatTensor([dictionary_of_labels[key]])
@@ -157,7 +157,7 @@ def main():
         start = timer()
         # Training
         net = NeuralNet()
-        opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999), weight_decay=0.01)
+        opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999), weight_decay=0.1)
         criterion = nn.BCELoss()
 
         for epoch in range(epochs):
@@ -183,6 +183,7 @@ def main():
 
         end = timer()
         print(end - start)
+        '''
         # Viterbi: Validation
         false_positive = 0
         false_negative = 0
@@ -291,7 +292,7 @@ def main():
         precision = true_positive / (true_positive + false_positive)
         recall = true_positive / (true_positive + false_negative)
         f1 = (2 * precision * recall) / (precision + recall)
-        print(f1)
+        print(f1)'''
 
         # Viterbi: Testing
         false_positive = 0
@@ -352,7 +353,7 @@ def main():
                 best_path.append(best_tag_id)
             start = best_path.pop()
             best_path.reverse()
-            print(best_path)
+            #print(best_path)
 
             for word_num in range(len(test_set[sentence_num]['ts_raw_tags'])):
                 predicted_tag = dictionary_of_labels_index[best_path[word_num]]
@@ -390,11 +391,11 @@ def main():
                 elif true_tag == 'T-NEG' and predicted_tag == 'O':
                     false_negative += 1
 
-                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEU':
+                elif true_tag == 'O' and predicted_tag == 'T-NEU':
                     false_positive += 1
-                elif true_tag == 'T-NEG' and predicted_tag == 'T-POS':
+                elif true_tag == 'O' and predicted_tag == 'T-POS':
                     false_positive += 1
-                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEG':
+                elif true_tag == 'O' and predicted_tag == 'T-NEG':
                     false_positive += 1
 
         precision = true_positive / (true_positive + false_positive)
