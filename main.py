@@ -19,7 +19,7 @@ from gensim.test.utils import datapath
 
 You may also use other parsing functions, but ONLY for parsing and ONLY from that file.
 '''
-embed_dimension = 10
+embed_dimension = 300
 epochs = 10
 
 
@@ -27,9 +27,9 @@ class NeuralNet(nn.Module):
 
     def __init__(self):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(24, 300)
+        self.fc1 = nn.Linear(2*embed_dimension+4, 800)
         self.act1 = nn.ReLU()
-        self.fc2 = nn.Linear(300, 4)
+        self.fc2 = nn.Linear(800, 4)
         self.act2 = nn.Softmax()
 
     def forward(self, input_):
@@ -93,7 +93,10 @@ def argmax(vec):
     return idx.item()
 
 def main():
-
+    false_positive = 0
+    false_negative = 0
+    true_positive = 0
+    true_negative = 0
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_file', type=str, default='data/twitter1_train.txt', help='Train file')
     parser.add_argument('--test_file', type=str, default='data/twitter1_test.txt', help='Test file')
@@ -157,7 +160,7 @@ def main():
         start = timer()
         # Training
         net = NeuralNet()
-        opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999), weight_decay=0.1)
+        opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999))
         criterion = nn.BCELoss()
 
         for epoch in range(epochs):
@@ -169,6 +172,7 @@ def main():
                     if word_num == 0:
                         arbitrary_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
                         concat = torch.cat((arbitrary_embed, word_embed, dictionary_of_label_embeddings['START']), 1)
+
                     else:
                         prev_word = train_set[sentence_num]['sentence'].split()[word_num - 1]
                         prev_word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[prev_word]]
@@ -295,9 +299,7 @@ def main():
         print(f1)'''
 
         # Viterbi: Testing
-        false_positive = 0
-        false_negative = 0
-        true_positive = 0
+
         for sentence_num in range(len(test_set)):
             init_vvars = torch.full((1, 6), -10000)
             init_vvars[0][4] = 0
@@ -309,7 +311,7 @@ def main():
                 try:
                     word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[word]]
                 except KeyError:
-                    word_embed = torch.zeros([1, 10])
+                    word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
 
                 bptrs_t = []
                 viterbivars_t = []
@@ -326,7 +328,7 @@ def main():
                         try:
                             prev_word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[prev_word]]
                         except KeyError:
-                            prev_word_embed = torch.zeros([1, 10])
+                            prev_word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
                         prev_label_embed = dictionary_of_label_embeddings[dictionary_of_labels_index[
                             next_tag]]  # dictionary_of_label_embeddings[validation_set[sentence_num]['ts_raw_tags'][word_num - 1]]
 
@@ -397,7 +399,13 @@ def main():
                     false_positive += 1
                 elif true_tag == 'O' and predicted_tag == 'T-NEG':
                     false_positive += 1
-
+                elif true_tag == 'O' and predicted_tag == 'O':
+                    true_negative += 1
+                else:
+                    print(true_tag)
+                    print(predicted_tag)
+                    print("SHOULDN'T BE HERE")
+        print(true_positive)
         precision = true_positive / (true_positive + false_positive)
         recall = true_positive / (true_positive + false_negative)
         f1 = (2 * precision * recall) / (precision + recall)
