@@ -87,6 +87,10 @@ def read_data(path):
     print("Obtain %s records from %s" % (len(dataset), path))
     return dataset
 
+def argmax(vec):
+    # return the argmax as a python int
+    _, idx = torch.max(vec, 1)
+    return idx.item()
 
 def main():
 
@@ -145,7 +149,7 @@ def main():
         dictionary_of_labels['T-POS'] = [0, 1, 0, 0]  # T-POS
         dictionary_of_labels['T-NEG'] = [0, 0, 1, 0]  # T-NEG
         dictionary_of_labels['O'] = [0, 0, 0, 1]  # O
-        dictionary_of_labels['START'] = [0, 0, 0, 0]  # START
+        dictionary_of_labels['START'] = [1, 1, 1, 1]  # START
 
         for key in dictionary_of_labels.keys():
             dictionary_of_label_embeddings[key] = torch.FloatTensor([dictionary_of_labels[key]])
@@ -180,57 +184,78 @@ def main():
         end = timer()
         print(end - start)
         # Viterbi: Label x Word
-        total_output = []
+        # Viterbi: Label x Word
+
         for sentence_num in range(len(validation_set)):
-            dp_table = np.zeros((4, len(validation_set[sentence_num]['sentence'].split())))
-            back_pointers = np.zeros((4, len(validation_set[sentence_num]['sentence'].split())))
-            for word_num in range(len(validation_set[sentence_num]['sentence'].split())):
-                word = validation_set[sentence_num]['sentence'].split()[word_num]
+            init_vvars = torch.full((1, 6), -10000)
+            init_vvars[0][4] = 0
+            backpointers= []
+            forward_var = init_vvars
+            for feat in range(len(validation_set[sentence_num]['sentence'].split())):
+
+                word = validation_set[sentence_num]['sentence'].split()[feat]
                 try:
                     word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[word]]
                 except KeyError:
-                    word_embed = torch.zeros([1,10])
+                    word_embed = torch.zeros([1, 10])
 
-                if word_num == 0:
-                    arbitrary_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
-                    concat = torch.cat((arbitrary_embed, word_embed, dictionary_of_label_embeddings['START']), 1)
-                    pred = net(autograd.Variable(concat))
+                bptrs_t = []
+                viterbivars_t = []
 
+                for next_tag in range(4):
+                    if feat == 0:
+                        arbitrary_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
+                        concat = torch.cat((arbitrary_embed, word_embed, dictionary_of_label_embeddings[dictionary_of_labels_index[next_tag]]), 1)
+                        pred = net(autograd.Variable(concat))
 
-                    dp_table[:,word_num] = pred.data.view(4).numpy()
-                    back_pointers[:,word_num] = 0
-                else:
-                    for k in range(4):
-                        prev_word = validation_set[sentence_num]['sentence'].split()[word_num - 1]
+                    else:
+                        prev_word = validation_set[sentence_num]['sentence'].split()[feat - 1]
                         try:
                             prev_word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[prev_word]]
                         except KeyError:
                             prev_word_embed = torch.zeros([1, 10])
-                        prev_label_embed = dictionary_of_label_embeddings[dictionary_of_labels_index[k]] #dictionary_of_label_embeddings[validation_set[sentence_num]['ts_raw_tags'][word_num - 1]]
+                        prev_label_embed = dictionary_of_label_embeddings[dictionary_of_labels_index[next_tag]]  # dictionary_of_label_embeddings[validation_set[sentence_num]['ts_raw_tags'][word_num - 1]]
 
                         concat = torch.cat((prev_word_embed, word_embed, prev_label_embed), 1)
                         pred = net(autograd.Variable(concat))
-                        print(pred)
-                        if k == 0:
-                            dp_table[:,word_num] = pred.data.view(4).numpy() + dp_table[k][word_num-1]
-                            back_pointers[:,word_num] = k
-                        else:
-                            for x in range(4):
-                                if(dp_table[x][word_num] < pred.data.view(4).numpy()[x] + dp_table[k][word_num-1]):
-                                    dp_table[x][word_num] = pred.data.view(4).numpy()[x] + dp_table[k][word_num-1]
-                                    dp_table[x][word_num] = k
-            output = []
-            for j in range(len(validation_set[sentence_num]['sentence'].split())-1, -1, -1):
-                if j == len(validation_set[sentence_num]['sentence'].split())-1:
-                    row_index = dp_table[:,j].argmax(axis=0)
-                    output.append(row_index)
-                    prevLabel = back_pointers[row_index][j]
-                else:
-                    output.append(prevLabel)
-                    prevLabel = back_pointers[int(prevLabel)][j]
-                    output.reverse()
 
-            print(output)
+
+                    next_tag_var = forward_var + torch.cat((pred, torch.zeros([1, 2])), 1)
+
+                    best_tag_id = argmax(next_tag_var)
+
+                    bptrs_t.append(best_tag_id)
+                    viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
+
+
+                forward_var = torch.cat((viterbivars_t)).view(1, -1)
+                forward_var = torch.cat((forward_var, torch.zeros([1,2])), 1)
+                backpointers.append(bptrs_t)
+            terminal_var = forward_var
+            best_tag_id = argmax(terminal_var)
+            path_score = terminal_var[0][best_tag_id]
+
+            best_path = [best_tag_id]
+            for bptrs_t in reversed(backpointers):
+                best_tag_id = bptrs_t[best_tag_id]
+                best_path.append(best_tag_id)
+            start = best_path.pop()
+            best_path.reverse()
+            print(best_path)
+
+
+
+
+
+                    #print(pred)
+
+
+            #print(output)
+            #for word_num in range(len(validation_set[sentence_num]['ts_raw_tags'])):
+
+                #print(validation_set[sentence_num]['ts_raw_tags'][word_num])
+
+
 
 
 
