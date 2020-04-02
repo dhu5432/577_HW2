@@ -183,9 +183,10 @@ def main():
 
         end = timer()
         print(end - start)
-        # Viterbi: Label x Word
-        # Viterbi: Label x Word
-
+        # Viterbi: Validation
+        false_positive = 0
+        false_negative = 0
+        true_positive = 0
         for sentence_num in range(len(validation_set)):
             init_vvars = torch.full((1, 6), -10000)
             init_vvars[0][4] = 0
@@ -244,16 +245,165 @@ def main():
             print(best_path)
 
 
+            for word_num in range(len(validation_set[sentence_num]['ts_raw_tags'])):
+                predicted_tag = dictionary_of_labels_index[best_path[word_num]]
+                true_tag = validation_set[sentence_num]['ts_raw_tags'][word_num]
+                if true_tag == 'T-NEU' and predicted_tag == 'T-NEU':
+                    true_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'T-POS':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'T-NEG':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-POS' and predicted_tag == 'T-NEU':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-POS' and predicted_tag == 'T-POS':
+                    true_positive+=1
+                elif true_tag == 'T-POS' and predicted_tag == 'T-NEG':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-POS' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEU':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-POS':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEG':
+                    true_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEU':
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-POS':
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEG':
+                    false_positive += 1
+
+        precision = true_positive / (true_positive + false_positive)
+        recall = true_positive / (true_positive + false_negative)
+        f1 = (2 * precision * recall) / (precision + recall)
+        print(f1)
+
+        # Viterbi: Testing
+        false_positive = 0
+        false_negative = 0
+        true_positive = 0
+        for sentence_num in range(len(test_set)):
+            init_vvars = torch.full((1, 6), -10000)
+            init_vvars[0][4] = 0
+            backpointers = []
+            forward_var = init_vvars
+            for feat in range(len(test_set[sentence_num]['sentence'].split())):
+
+                word = test_set[sentence_num]['sentence'].split()[feat]
+                try:
+                    word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[word]]
+                except KeyError:
+                    word_embed = torch.zeros([1, 10])
+
+                bptrs_t = []
+                viterbivars_t = []
+
+                for next_tag in range(4):
+                    if feat == 0:
+                        arbitrary_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[' ']]
+                        concat = torch.cat((arbitrary_embed, word_embed,
+                                            dictionary_of_label_embeddings[dictionary_of_labels_index[next_tag]]), 1)
+                        pred = net(autograd.Variable(concat))
+
+                    else:
+                        prev_word = test_set[sentence_num]['sentence'].split()[feat - 1]
+                        try:
+                            prev_word_embed = dictionary_of_word_embeddings[dictionary_of_words_reversed[prev_word]]
+                        except KeyError:
+                            prev_word_embed = torch.zeros([1, 10])
+                        prev_label_embed = dictionary_of_label_embeddings[dictionary_of_labels_index[
+                            next_tag]]  # dictionary_of_label_embeddings[validation_set[sentence_num]['ts_raw_tags'][word_num - 1]]
+
+                        concat = torch.cat((prev_word_embed, word_embed, prev_label_embed), 1)
+                        pred = net(autograd.Variable(concat))
+
+                    next_tag_var = forward_var + torch.cat((pred, torch.zeros([1, 2])), 1)
+
+                    best_tag_id = argmax(next_tag_var)
+
+                    bptrs_t.append(best_tag_id)
+                    viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
+
+                forward_var = torch.cat((viterbivars_t)).view(1, -1)
+                forward_var = torch.cat((forward_var, torch.zeros([1, 2])), 1)
+                backpointers.append(bptrs_t)
+            terminal_var = forward_var
+            best_tag_id = argmax(terminal_var)
+            path_score = terminal_var[0][best_tag_id]
+
+            best_path = [best_tag_id]
+            for bptrs_t in reversed(backpointers):
+                best_tag_id = bptrs_t[best_tag_id]
+                best_path.append(best_tag_id)
+            start = best_path.pop()
+            best_path.reverse()
+            print(best_path)
+
+            for word_num in range(len(test_set[sentence_num]['ts_raw_tags'])):
+                predicted_tag = dictionary_of_labels_index[best_path[word_num]]
+                true_tag = test_set[sentence_num]['ts_raw_tags'][word_num]
+                if true_tag == 'T-NEU' and predicted_tag == 'T-NEU':
+                    true_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'T-POS':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'T-NEG':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEU' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-POS' and predicted_tag == 'T-NEU':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-POS' and predicted_tag == 'T-POS':
+                    true_positive += 1
+                elif true_tag == 'T-POS' and predicted_tag == 'T-NEG':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-POS' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEU':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-POS':
+                    false_negative += 1
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEG':
+                    true_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'O':
+                    false_negative += 1
+
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEU':
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-POS':
+                    false_positive += 1
+                elif true_tag == 'T-NEG' and predicted_tag == 'T-NEG':
+                    false_positive += 1
+
+        precision = true_positive / (true_positive + false_positive)
+        recall = true_positive / (true_positive + false_negative)
+        f1 = (2 * precision * recall) / (precision + recall)
+        print(f1)
 
 
 
-                    #print(pred)
-
-
-            #print(output)
-            #for word_num in range(len(validation_set[sentence_num]['ts_raw_tags'])):
-
-                #print(validation_set[sentence_num]['ts_raw_tags'][word_num])
 
 
 
