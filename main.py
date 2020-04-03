@@ -20,7 +20,7 @@ from gensim.test.utils import datapath
 You may also use other parsing functions, but ONLY for parsing and ONLY from that file.
 '''
 embed_dimension = 300
-epochs = 5
+epochs = 1
 
 
 class NeuralNet(nn.Module):
@@ -32,7 +32,7 @@ class NeuralNet(nn.Module):
         self.fc2 = nn.Linear(400, 200)
         self.act2 = nn.Sigmoid()
         self.fc3 = nn.Linear(200, 4)
-        self.act3 = nn.Softmax()
+        self.act3 = nn.LogSoftmax()
 
     def forward(self, input_):
         a1 = self.fc1(input_)
@@ -93,8 +93,15 @@ def read_data(path):
 
 def argmax(vec):
     # return the argmax as a python int
-    _, idx = torch.max(vec, 1)
-    return idx.item()
+    max = vec[0][0]
+    max_index = 0
+    for i in range(1,4):
+        if vec[0][i] > max:
+            max = vec[0][i]
+            max_index = i
+    return max_index
+    #_, idx = torch.max(vec, 1)
+    #return idx.item()
 
 def main():
     false_positive = 0
@@ -108,6 +115,7 @@ def main():
     args = parser.parse_args()
     print(vars(args)['option'])
 
+    # Option 1
     if vars(args)['option'] == 1:
         train_set = read_data(path=args.train_file)
         test_set = read_data(path=args.test_file)
@@ -185,6 +193,7 @@ def main():
                     opt.zero_grad()
                     word_embed = autograd.Variable(concat)
                     pred = net(word_embed)
+                    print(pred)
                     gold_label_class = torch.max(gold_label_embed, 1)[1]
 
                     loss = criterion(pred, gold_label_class)
@@ -304,6 +313,7 @@ def main():
         f1 = (2 * precision * recall) / (precision + recall)
         print(f1)
 
+    # Option 2
     if vars(args)['option'] == 2:
         train_set = read_data(path=args.train_file)
         test_set = read_data(path=args.test_file)
@@ -350,7 +360,7 @@ def main():
         criterion = nn.NLLLoss()
 
         for epoch in range(epochs):
-            print("Epoch {}".format(epoch))
+            print("Epoch {}".format(epoch+1))
             for sentence_num in range(len(train_set)):
                 for word_num in range(len(train_set[sentence_num]['sentence'].split())):
                     word = train_set[sentence_num]['sentence'].split()[word_num]
@@ -376,7 +386,6 @@ def main():
                     opt.zero_grad()
                     word_embed = autograd.Variable(concat)
                     pred = net(word_embed)
-                    pred_class = torch.max(pred, 1)[1]
                     gold_label_class = torch.max(gold_label_embed, 1)[1]
 
                     loss = criterion(pred, gold_label_class)
@@ -398,7 +407,7 @@ def main():
                 try:
                     word_embed = torch.from_numpy(wv_from_bin[word]).view(1, 300)
                 except KeyError:
-                    word_embed = torch.zeros([1 , 300])
+                    word_embed = torch.zeros([1, 300])
 
                 bptrs_t = []
                 viterbivars_t = []
@@ -423,9 +432,9 @@ def main():
                         pred = net(autograd.Variable(concat))
 
                     next_tag_var = forward_var + torch.cat((pred, torch.zeros([1, 2])), 1)
-
+                    #print(next_tag_var)
                     best_tag_id = argmax(next_tag_var)
-
+                    #print(best_tag_id)
                     bptrs_t.append(best_tag_id)
                     viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
 
@@ -437,6 +446,7 @@ def main():
             path_score = terminal_var[0][best_tag_id]
 
             best_path = [best_tag_id]
+            #print(best_tag_id)
             for bptrs_t in reversed(backpointers):
                 best_tag_id = bptrs_t[best_tag_id]
                 best_path.append(best_tag_id)
