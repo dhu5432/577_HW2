@@ -347,7 +347,7 @@ def main():
         # Training
         net = NeuralNet()
         opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999))
-        criterion = nn.NLLLoss(torch.tensor([1.0, 1.0, 1.0, 0.2]))
+        criterion = nn.NLLLoss()
 
         for epoch in range(epochs):
             print("Epoch {}".format(epoch))
@@ -442,7 +442,7 @@ def main():
                 best_path.append(best_tag_id)
             start = best_path.pop()
             best_path.reverse()
-            print(best_path)
+            #print(best_path)
 
             for word_num in range(len(test_set[sentence_num]['ts_raw_tags'])):
                 predicted_tag = dictionary_of_labels_index[best_path[word_num]]
