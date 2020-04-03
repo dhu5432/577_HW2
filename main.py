@@ -165,7 +165,7 @@ def main():
         # Training
         net = NeuralNet()
         opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999))
-        criterion = nn.NLLLoss
+        criterion = nn.NLLLoss()
 
         for epoch in range(epochs):
             for sentence_num in range(len(train_set)):
