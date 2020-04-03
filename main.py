@@ -20,7 +20,7 @@ from gensim.test.utils import datapath
 You may also use other parsing functions, but ONLY for parsing and ONLY from that file.
 '''
 embed_dimension = 300
-epochs = 10
+epochs = 5
 
 
 class NeuralNet(nn.Module):
@@ -165,7 +165,7 @@ def main():
         # Training
         net = NeuralNet()
         opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999))
-        criterion = nn.BCELoss()
+        criterion = nn.NLLLoss
 
         for epoch in range(epochs):
             for sentence_num in range(len(train_set)):
@@ -193,7 +193,6 @@ def main():
         print(end - start)
 
         # Viterbi: Testing
-
         for sentence_num in range(len(test_set)):
             init_vvars = torch.full((1, 6), -10000)
             init_vvars[0][4] = 0
@@ -296,8 +295,6 @@ def main():
                 elif true_tag == 'O' and predicted_tag == 'O':
                     true_negative += 1
                 else:
-                    print(true_tag)
-                    print(predicted_tag)
                     print("SHOULDN'T BE HERE")
         print(true_positive)
         precision = true_positive / (true_positive + false_positive)
@@ -348,7 +345,7 @@ def main():
         # Training
         net = NeuralNet()
         opt = optim.Adam(net.parameters(), lr=0.01, betas=(0.9, 0.999))
-        criterion = nn.BCELoss()
+        criterion = nn.NLLLoss(torch.tensor([1.0, 1.0, 1.0, 0.2]))
 
         for epoch in range(epochs):
             print("Epoch {}".format(epoch))
@@ -378,7 +375,10 @@ def main():
                     opt.zero_grad()
                     word_embed = autograd.Variable(concat)
                     pred = net(word_embed)
-                    loss = criterion(pred, gold_label_embed)
+                    pred_class = torch.max(pred, 1)[1]
+                    gold_label_class = torch.max(gold_label_embed, 1)[1]
+
+                    loss = criterion(pred, gold_label_class)
                     loss.backward()
                     opt.step()
 
@@ -386,7 +386,6 @@ def main():
         print(end - start)
 
         # Viterbi: Testing
-
         for sentence_num in range(len(test_set)):
             init_vvars = torch.full((1, 6), -10000)
             init_vvars[0][4] = 0
@@ -442,7 +441,7 @@ def main():
                 best_path.append(best_tag_id)
             start = best_path.pop()
             best_path.reverse()
-            #print(best_path)
+            print(best_path)
 
             for word_num in range(len(test_set[sentence_num]['ts_raw_tags'])):
                 predicted_tag = dictionary_of_labels_index[best_path[word_num]]
@@ -524,17 +523,12 @@ def main():
     # example to load the Word2Vec model
     # note: this will only work on a cs machine (ex: data.cs.purdue.edu)
     #wv_from_bin = KeyedVectors.load_word2vec_format(datapath("/homes/cs577/hw2/w2v.bin"), binary=True)
-    wv_from_bin = KeyedVectors.load_word2vec_format("w2v.bin", binary=True)
-    # you can get the vector for a word like so
-    vector = wv_from_bin['man']
-    print(vector)
+
+
     #for entry in train_set:
         #print(entry)
 
-    print("")
-    print("Precision: ")
-    print("Recall: ")
-    print("F1: ")
+
 
 if __name__ == '__main__':
         main()
