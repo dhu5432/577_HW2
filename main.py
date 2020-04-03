@@ -185,7 +185,9 @@ def main():
                     opt.zero_grad()
                     word_embed = autograd.Variable(concat)
                     pred = net(word_embed)
-                    loss = criterion(pred, gold_label_embed)
+                    gold_label_class = torch.max(gold_label_embed, 1)[1]
+
+                    loss = criterion(pred, gold_label_class)
                     loss.backward()
                     opt.step()
 
@@ -361,7 +363,6 @@ def main():
                     if word_num == 0:
                         arbitrary_embed = torch.zeros([1, 300])
                         concat = torch.cat((arbitrary_embed, word_embed.view(1, 300), dictionary_of_label_embeddings['START']), 1)
-
 
                     else:
                         prev_word = train_set[sentence_num]['sentence'].split()[word_num - 1]
